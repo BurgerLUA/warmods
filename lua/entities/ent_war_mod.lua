@@ -17,6 +17,7 @@ function ENT:Initialize()
 		self:SetSolid(SOLID_VPHYSICS)
 		self:DrawShadow(false)
 		self:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		self:SetUseType(SIMPLE_USE)
 		
 		local phys = self:GetPhysicsObject()
 		if phys:IsValid() then
@@ -34,31 +35,18 @@ function ENT:PhysicsCollide(data, physobj)
 
 end
 
-function ENT:Think()
 
-	if SERVER then
-		local Data = {
-			start = self:GetPos(), 
-			endpos = self:GetPos(), 
-			filter = self
-		}
+function ENT:Use(activator,caller,useType,value)
 
-		local Trace = util.TraceEntity( Data, self )
-		
-		if ( Trace.Entity ) then
-			if Trace.Entity == self:GetNWEntity("Target",self) then
-			
-				WarGiveRandomMod(self:GetNWEntity("Target",self))
-				
-				SafeRemoveEntity(self)
-			end
-		end
+	if activator:IsPlayer() and self:CanPickup(activator) then
+		WarGiveRandomMod(self:GetNWEntity("Target",self))
+		SafeRemoveEntity(self)
 	end
-	
+
 end
 
 function ENT:CanPickup(ply)
-	return self:GetNWEntity("Target",self) == LocalPlayer()
+	return self:GetNWEntity("Target",self) == ply
 end
 
 

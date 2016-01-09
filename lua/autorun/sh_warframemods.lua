@@ -20,7 +20,16 @@ WarframeMods["health"] = {
 	CostPower = 1.25,
 }
 
-local NewPlayerMods = {"damage","health"}
+WarframeMods["armor"] = {
+	Name = "Armor Boost",
+	Type = "ArmorMul",
+	Slot = "Weapon",
+	RankValue = {10,20,30,40,50,60,70,80,90,100},
+	BaseCapacity = 5,
+	CostPower = 1.25,
+}
+
+local NewPlayerMods = {"damage","health","armor"}
 
 local DefaultDataString = "0 0 0 0 0 0 0 0 0 0"
 local DefaultDataTable = string.Explode(" ",DefaultDataString)

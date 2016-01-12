@@ -3,36 +3,47 @@ print("War Mods Loaded!")
 local WarframeMods = {}
 
 WarframeMods["damage"] = {
-	Name = "Damage Boost",
+	Name = "Overpacked Bullets",
 	Type = "DamageMul",
 	Logo = "hud/leaderboard_class_demo",
 	Desc = "Increases damage output by _%",
-	RankValue = {30,40,50,60,70,80,90,100,110,120},
+	RankValue = {10,20,30,40,50,60,70,80,90,100},
 	BaseCapacity = 5,
 	CostPower = 1.25,
 }
 
 WarframeMods["health"] = {
-	Name = "Health Boost",
+	Name = "Skin Augmentation",
 	Type = "HealthMul",
 	Logo = "hud/leaderboard_class_medic",
 	Desc = "Increases damage resistance by _%",
-	RankValue = {40,45,50,55,60,65,60,65,70,75},
+	RankValue = {5,10,15,20,25,30,35,40,45,50},
 	BaseCapacity = 5,
 	CostPower = 1.25,
 }
-
+--[[
 WarframeMods["speed"] = {
-	Name = "Speed Boost",
+	Name = "Adrenaline",
 	Type = "SpeedMul",
-	Logo = "hud/leaderboard_class_soldier_sergeant_crits",
-	Desc = "Increases speed by %_",
+	Logo = "hud/leaderboard_class_scout_giant_fast",
+	Desc = "Increases speed by _%",
 	RankValue = {5,10,15,20,25,30,35,40,45,50},
 	BaseCapacity = 5,
 	CostPower = 1.25,
 }
 
-local NewPlayerMods = {"damage","health","speed"}
+WarframeMods["ammo"] = {
+	Name = "Custom Magazine",
+	Type = "ClipMul",
+	Logo = "hud/leaderboard_class_heavy",
+	Desc = "Increases clip size by _%",
+	RankValue = {20,30,40,50,60,70,80,90,100,110},
+	BaseCapacity = 5,
+	CostPower = 1.25,
+}
+--]]
+
+local NewPlayerMods = {"damage","health"}
 
 local DefaultDataString = "0 0 0 0 0 0 0 0 0 0"
 local DefaultDataTable = string.Explode(" ",DefaultDataString)
@@ -98,6 +109,8 @@ if SERVER then
 	
 	util.AddNetworkString( "WarDataSendToClient" )
 	util.AddNetworkString( "WarNetSendTransmute" )
+	util.AddNetworkString( "WarPickupCard" )
+	util.AddNetworkString( "WarNetSendActivation")
 	
 	hook.Add("PlayerSpawn","War Data Player Initialize",WarDataPlayerInitalize)
 	
@@ -105,9 +118,15 @@ if SERVER then
 	
 		--print("Giving " .. count .. " rank " .. rank .. " " .. mod.. " mod(s) to " .. ply:Nick() .. "...")
 
-		local Add = DefaultDataTable
+		print("PICKUP")
 		
-		--print("RANK:",rank)
+		net.Start("WarPickupCard")
+			net.WriteString(mod)
+			net.WriteFloat(rank)
+			net.WriteFloat(count)
+		net.Send(ply)
+		
+		local Add = DefaultDataTable
 		
 		Add[rank] = Add[rank] + count
 
@@ -228,8 +247,11 @@ if SERVER then
 		local AllMods = WarGetAllModClasses()
 		local SelectedModType = AllMods[math.random(1,#AllMods)]
 		local Rank = WarGetRandRank()
-		--print("RANK FAGGOT",Rank)
+		
+
+
 		WarDataGiveMod(ply,SelectedModType,Rank,1)
+		
 	end
 	
 	function WarChancePower(power)
@@ -279,36 +301,86 @@ if SERVER then
 	
 	end)
 	
+	net.Receive("WarNetSendActivation", function(len,ply)
+	
+		local mod = net.ReadString()
+		local rank = net.ReadFloat()
+		local RealData = WarframeMods[mod]
+		local RealPower = RealData.RankValue[rank]
+		
+		WarDataAdd(ply,mod,rank,-1)
+		
+		ply:SetNWString("WarModClass",mod)
+		ply:SetNWFloat("WarModRank",rank)
+		ply:SetNWFloat("WarModPower",RealPower)
+		ply:SetNWBool("WarModActivated",false)
+		ply:SetNWFloat("WarModUses",3)
+		
+	end)
+	
+	function WarMod_PlayerSpawn(ply)
+	
+		if ply:GetNWString("WarModClass","none") ~= "none" then
+			if ply:GetNWFloat("WarModUses",-1) <= 1 then
+				ply:SetNWString("WarModClass","none")
+				ply:SetNWBool("WarModActivated",false)
+			else
+				if not ply:GetNWBool("WarModActivated",false) then
+					ply:SetNWBool("WarModActivated",true)
+				else
+					local Uses = ply:GetNWFloat("WarModUses",-1)
+					ply:SetNWFloat("WarModUses", Uses - 1)
+				end
+			end
+		end
+	end
+	
+	hook.Add("PlayerSpawn","War Mods: Player Spawn",WarMod_PlayerSpawn)
+	
+	function WarMod_ScalePlayerDamage(victim,hitgroup,dmginfo)
+	
+		local attacker = dmginfo:GetAttacker()
+		
+		if victim:IsPlayer() then
+			if victim:GetNWString("WarModClass","none") == "health" and victim:GetNWBool("WarModActivated",false) then
+				dmginfo:ScaleDamage( 1 - victim:GetNWFloat("WarModPower",0) * 0.01)
+			end
+		end
+		
+		if attacker:IsPlayer() then
+			if attacker:GetNWString("WarModClass","none") == "damage" and attacker:GetNWBool("WarModActivated",false) then
+				print("NICE MOD BRO")
+				dmginfo:ScaleDamage( 1 + attacker:GetNWFloat("WarModPower",0) * 0.01)
+			end
+		end
+
+	end
+	
+	hook.Add("ScalePlayerDamage","War Mods: Scale Damage",WarMod_ScalePlayerDamage)
 	
 	
+	
+	--[[
+	WarframeMods["ammo"] = {
+		Name = "Custom Magazine",
+		Type = "ClipMul",
+		Logo = "hud/leaderboard_class_heavy",
+		Desc = "Increases clip size by _%",
+		RankValue = {20,30,40,50,60,70,80,90,100,110},
+		BaseCapacity = 5,
+		CostPower = 1.25,
+	}
+	--]]
 	
 
 end
 
 
+
 if CLIENT then
 
-	surface.CreateFont( "WarFontTitle", {
-		font = "Coolvetica", -- Use the font-name which is shown to you by your operating system Font Viewer, not the file name
-		size = 32,
-		weight = 100,
-		antialias = true,
-	} )
 	
-	surface.CreateFont( "WarFontCount", {
-		font = "Coolvetica", -- Use the font-name which is shown to you by your operating system Font Viewer, not the file name
-		size = 16,
-		weight = 200,
-		antialias = true,
-	} )
 
-	surface.CreateFont( "WarFontDesc", {
-		font = "Coolvetica", -- Use the font-name which is shown to you by your operating system Font Viewer, not the file name
-		size = 26,
-		weight = 100,
-		antialias = true,
-	} )
-	
 
 	local Frame = {}
 	local Title = {}
@@ -317,8 +389,104 @@ if CLIENT then
 	local TitleBase = {}
 	local ShinyBase = {}
 	local DescBase = {}
+	local DescBase = {}
 	local Desc = {}
 	local Image = {}
+	
+	local Theme = Color(255,255,255,255)
+	local Corner = 8
+	
+	local xsize = 800
+	local ysize = 600
+	
+	
+	if WarPickupCardList then 
+		WarPickupCardList:Remove()
+		WarPickupCardList = nil
+	end
+	
+	if WarActivatedCardList then
+		WarActivatedCardList:Remove()
+		WarActivatedCardList = nil
+	end
+	
+	if WarActivatedCard then
+		WarActivatedCard:Remove()
+		WarActivatedCard = nil
+	end
+	
+	net.Receive("WarPickupCard", function()
+
+		local mod = net.ReadString()
+		local rank = net.ReadFloat()
+		local count = net.ReadFloat()
+		local Card = WarCreateCard(xsize,ysize,WarPickupCardList,mod,rank,count)
+		
+		timer.Simple(10,function() Card:Remove() end)
+		
+	end)
+	
+	local CurrentCardMod = nil
+	local First = false
+	
+	function War_Think()
+	
+		local ply = LocalPlayer()
+		
+		if not First then 
+	
+			WarPickupCardList = vgui.Create( "DIconLayout", Scroll )
+			WarPickupCardList:SetPos( ScrW()*0.9 - xsize*0.1, ScrH()*0.9 - ysize*0.75 )
+			WarPickupCardList:SetSize( ScrW()*0.1 + xsize*0.1,ScrH()*0.1 + ysize*0.1 )
+			WarPickupCardList:SetSpaceX( ScrW()*0.01 )
+			WarPickupCardList:SetSpaceY( ScrW()*0.01 )
+			
+			WarActivatedCardList = vgui.Create( "DIconLayout", Scroll )
+			WarActivatedCardList:SetPos( ScrW()*0.01, ScrH()*0.01 )
+			WarActivatedCardList:SetSize( ScrW()*0.9 - xsize*0.1,ScrH()*0.9 - ysize*0.1 )
+			WarActivatedCardList:SetSpaceX( ScrW()*0.01 )
+			WarActivatedCardList:SetSpaceY( ScrW()*0.01 )
+	
+			First = true
+		
+		end
+	
+		local mod = ply:GetNWString("WarModClass","none")
+		local rank = ply:GetNWFloat("WarModRank",0)
+		local count = ply:GetNWFloat("WarModUses",0)
+		
+		local Activated = ply:GetNWBool("WarModActivated",false)
+
+		local Benchmark = mod .. "_" .. rank .. "_" .. count
+		
+		--print(CurrentCardMod,Benchmark)
+		
+		
+		if not CurrentCardMod or (CurrentCardMod and CurrentCardMod ~= Benchmark) then
+			
+			if WarActivatedCard then
+				WarActivatedCard:Remove()
+				WarActivatedCard = nil
+			end
+			
+			CurrentCardMod = Benchmark
+		end
+		
+		if mod ~= "none" and rank ~= 0 and count ~= 0 and Activated then
+			if not WarActivatedCard then
+				WarActivatedCard = WarCreateCard(xsize,ysize,WarActivatedCardList,mod,rank,count)
+			end
+		end
+		
+
+	end
+	
+	hook.Add("Think","WarMod: Think",War_Think)
+	
+
+	function TranslateTheme(Mul)
+		return Color(Theme.r*Mul,Theme.g*Mul,Theme.b*Mul,Theme.a)
+	end
 
 	net.Receive("WarDataSendToClient", function(len)
 	
@@ -333,13 +501,35 @@ if CLIENT then
 	
 		local BaseFrame = vgui.Create( "DFrame" ) //Create a Frame to contain everything.
 		BaseFrame:SetTitle( "DIconLayout Example" )
-		BaseFrame:SetSize( x,y )
+		BaseFrame:SetSize( x - Small*3,y )
 		BaseFrame:Center()
 		BaseFrame:MakePopup()
-
+		
+		function BaseFrame:Paint(w,h)
+			draw.RoundedBox( Corner, 0, 0, w, h, TranslateTheme(0.1) )
+		end
+	
 		local Scroll = vgui.Create( "DScrollPanel", BaseFrame ) //Create the Scroll panel
 		Scroll:SetPos( Small, 20 + Small )
-		Scroll:SetSize( x - Small*2, y - 40 )
+		Scroll:SetSize( x - Small*5, y - 40 )
+		
+		local Scrollbar = Scroll:GetVBar()
+		
+		function Scrollbar:Paint( w, h )
+			draw.RoundedBox( Corner, 0, 0, Small*2, h, TranslateTheme(0.25) )
+		end
+		
+		function Scrollbar.btnUp:Paint( w, h )
+			draw.RoundedBox( Corner, 0, 0, Small*2, h, TranslateTheme(0.5) )
+		end
+		
+		function Scrollbar.btnDown:Paint( w, h )
+			draw.RoundedBox( Corner, 0, 0, Small*2, h, TranslateTheme(0.5) )
+		end
+		
+		function Scrollbar.btnGrip:Paint( w, h )
+			draw.RoundedBox( Corner, 0, 0, Small*2, h, TranslateTheme(0.75) )
+		end
 		
 		local List	= vgui.Create( "DIconLayout", Scroll )
 		List:SetPos( 0, 0 )
@@ -358,6 +548,27 @@ if CLIENT then
 	
 	function WarCreateCard(x,y,List,mod,rank,count)
 	
+		surface.CreateFont( "WarFontTitle", {
+			font = "Coolvetica",
+			size = math.floor(y*0.05),
+			weight = 100,
+			antialias = true,
+		} )
+	
+		surface.CreateFont( "WarFontCount", {
+			font = "Coolvetica",
+			size = math.floor(y*0.025),
+			weight = 200,
+			antialias = true,
+		} )
+
+		surface.CreateFont( "WarFontDesc", {
+			font = "Coolvetica",
+			size = math.floor(y*0.04),
+			weight = 100,
+			antialias = true,
+		} )
+	
 		local OfficialData = WarframeMods[mod]
 					
 		local BaseX = x*0.3
@@ -370,22 +581,39 @@ if CLIENT then
 		
 			Frame[Count] = List:Add("DPanel")
 			Frame[Count]:SetSize(BaseX,BaseY)
+			--[[
+			local FuckYou = Frame[Count]
+			function FuckYou:Paint(w,h)
+				draw.RoundedBox( Corner, 0, 0, w, h, TranslateTheme(1) )
+			end
+			--]]
 
 			CountBase[Count] = vgui.Create("DButton",Frame[Count])
 			CountBase[Count]:SetPos(BaseX - BaseY*0.1 + Small,0)
 			CountBase[Count]:SetSize(BaseY*0.1 - Small,BaseY*0.1 - Small)
+			--CountBase[Count]:SetImage("vgui/backpack_jewel_modify_target_b_g")
 			CountBase[Count]:SetText(count)
 			CountBase[Count]:SetFont("WarFontCount")
+			CountBase[Count]:SetColor(TranslateTheme(0.1))
+			
+			local FuckYou = CountBase[Count]
+			function FuckYou:Paint(w,h)
+				draw.RoundedBox( Corner, 0, 0, w, h, TranslateTheme(0.80) )
+			end
 			
 			CountBase[Count].DoClick = function() 
 				TransmuteOptions[Count] = vgui.Create("DMenu")
-				TransmuteOptions[Count]:AddOption("Transmute X3", function()
+				TransmuteOptions[Count]:AddOption("Activate (3 Charges)", function()
+					WarSendActivation(x,y,List,mod,rank)
+					chat.AddText(Color(255,255,255,255),"Activated mod. Will apply on next spawn.")
+				end)
+				TransmuteOptions[Count]:AddOption("Transmute x3", function()
 					WarSendTransmute(x,y,List,mod,rank,1)
 				end)
-				TransmuteOptions[Count]:AddOption("Transmute X15", function()
+				TransmuteOptions[Count]:AddOption("Transmute x15", function()
 					WarSendTransmute(x,y,List,mod,rank,5)
 				end)
-				TransmuteOptions[Count]:AddOption("Transmute X30", function()
+				TransmuteOptions[Count]:AddOption("Transmute x30", function()
 					WarSendTransmute(x,y,List,mod,rank,10)
 				end)
 				
@@ -403,10 +631,18 @@ if CLIENT then
 			TitleBase[Count] = vgui.Create("DPanel",Frame[Count])
 			TitleBase[Count]:SetPos(Small,BaseY*0.5 - Small)
 			TitleBase[Count]:SetSize(BaseX - Small*2,BaseY*0.15 - Small*2)
+			--[[
+			local FuckYou = TitleBase[Count]
+			function FuckYou:Paint(w,h)
+				draw.RoundedBox( Corner, 0, 0, w, h, TranslateTheme(0.80) )
+			end
+			--]]
+			
+			
 			
 			Title[Count] = vgui.Create("DLabel",TitleBase[Count])
 			Title[Count]:SetText(OfficialData.Name)
-			Title[Count]:SetDark(true)
+			Title[Count]:SetColor(TranslateTheme(0.10))
 			Title[Count]:SetFont("WarFontTitle")
 			Title[Count]:SizeToContents(true)
 			Title[Count]:Center()
@@ -415,6 +651,12 @@ if CLIENT then
 			DescBase[Count]:SetPos(Small,BaseY*0.6 - Small*0.5)
 			DescBase[Count]:SetSize(BaseX - Small*2,BaseY*0.35 - Small*2)
 			
+			--[[
+			local FuckYou = DescBase[Count]
+			function FuckYou:Paint(w,h)
+				draw.RoundedBox( Corner, 0, 0, w, h, TranslateTheme(0.80) )
+			end
+			--]]
 			
 			local ValueThing = tostring(OfficialData.RankValue[rank])
 			
@@ -442,6 +684,8 @@ if CLIENT then
 			end
 			
 		end
+		
+		return Frame[Count]
 
 	end
 	
@@ -470,6 +714,25 @@ if CLIENT then
 		
 		end
 	
+	end
+	
+	function WarSendActivation(x,y,List,mod,rank)
+	
+		local CurrentCount = tonumber( CountBase[mod .. rank]:GetText())
+	
+		if CurrentCount >= 1 then
+	
+			CountBase[mod .. rank]:SetText( CurrentCount - 1)
+
+			local ply = LocalPlayer()
+			
+			net.Start("WarNetSendActivation")
+				net.WriteString(mod)
+				net.WriteFloat(rank)
+			net.SendToServer()
+		
+		end
+
 	end
 	
 	

@@ -2,6 +2,8 @@ print("War Mods Loaded!")
 
 local WarframeMods = {}
 
+local TransmuteCost = 2
+
 WarframeMods["damage"] = {
 	Name = "Overpacked Bullets",
 	Type = "DamageMul",
@@ -12,6 +14,7 @@ WarframeMods["damage"] = {
 	CostPower = 1.25,
 }
 
+--[[
 WarframeMods["health"] = {
 	Name = "Skin Augmentation",
 	Type = "HealthMul",
@@ -21,7 +24,8 @@ WarframeMods["health"] = {
 	BaseCapacity = 5,
 	CostPower = 1.25,
 }
---[[
+
+
 WarframeMods["speed"] = {
 	Name = "Adrenaline",
 	Type = "SpeedMul",
@@ -32,16 +36,40 @@ WarframeMods["speed"] = {
 	CostPower = 1.25,
 }
 
+--]]
+
 WarframeMods["ammo"] = {
 	Name = "Custom Magazine",
 	Type = "ClipMul",
 	Logo = "hud/leaderboard_class_heavy",
 	Desc = "Increases clip size by _%",
-	RankValue = {20,30,40,50,60,70,80,90,100,110},
+	RankValue = {10,20,30,40,50,60,70,80,90,100},
 	BaseCapacity = 5,
 	CostPower = 1.25,
 }
---]]
+
+WarframeMods["accuracy"] = {
+	Name = "Long Barrel",
+	Type = "ClipMul",
+	Logo = "hud/leaderboard_class_sniper",
+	Desc = "Decreases spread by _%",
+	RankValue = {7,14,21,28,35,42,49,56,63,70},
+	BaseCapacity = 5,
+	CostPower = 1.25,
+}
+
+WarframeMods["rate"] = {
+	Name = "Barrage",
+	Type = "ClipMul",
+	Logo = "hud/leaderboard_class_soldier_barrage",
+	Desc = "Increases fire rate by _%",
+	RankValue = {5,10,15,20,25,30,35,40,45,50},
+	BaseCapacity = 5,
+	CostPower = 1.25,
+}
+
+
+
 
 local NewPlayerMods = {"damage","health"}
 
@@ -118,7 +146,7 @@ if SERVER then
 	
 		--print("Giving " .. count .. " rank " .. rank .. " " .. mod.. " mod(s) to " .. ply:Nick() .. "...")
 
-		print("PICKUP")
+		--print("PICKUP")
 		
 		net.Start("WarPickupCard")
 			net.WriteString(mod)
@@ -184,11 +212,11 @@ if SERVER then
 	end
 	
 	function WarDataTransmute(ply,mod,rank,count)
-
+	
 		local CurrentModCount = WarDataGetModCountSingle(ply,mod,rank)
 		
-		if CurrentModCount >= count*3 and rank < 10 then
-			WarDataAdd(ply,mod,rank,-3*count)
+		if CurrentModCount >= count*TransmuteCost and rank < 10 then
+			WarDataAdd(ply,mod,rank,-TransmuteCost*count)
 			WarDataAdd(ply,mod,rank+1,count)
 			ply:ChatPrint("Transmute successful")
 		end
@@ -254,19 +282,18 @@ if SERVER then
 		
 	end
 	
-	function WarChancePower(power)
-		return math.Rand(1,100) >= (100 / (2^power))
-	end
+
+	
 	
 	function WarGetRandRank()
 	
-		local SelectedRank = 1
+		local SelectedRank = 5
 		
-		for i=1,9 do
-			if WarChancePower(i) then
-				SelectedRank = i + math.random(0,1)
-				--print("SelectedRank: ",SelectedRank)
-				return SelectedRank
+		local Rand = math.Rand(1,100)
+		
+		for i=1, 5 do
+			if Rand > (50 / i) then
+				return i
 			end
 		end
 
@@ -276,7 +303,7 @@ if SERVER then
 	
 	function WarGetRandRankDebug()
 		for i=1,100 do
-			WarGetRandRank()
+			print(WarGetRandRank())
 		end
 	end
 	
@@ -337,6 +364,7 @@ if SERVER then
 	
 	hook.Add("PlayerSpawn","War Mods: Player Spawn",WarMod_PlayerSpawn)
 	
+	--[[
 	function WarMod_ScalePlayerDamage(victim,hitgroup,dmginfo)
 	
 		local attacker = dmginfo:GetAttacker()
@@ -357,6 +385,10 @@ if SERVER then
 	end
 	
 	hook.Add("ScalePlayerDamage","War Mods: Scale Damage",WarMod_ScalePlayerDamage)
+	--]]
+	
+	
+
 	
 	
 	
@@ -375,12 +407,88 @@ if SERVER then
 
 end
 
+function WarMod_SharedThink()
+
+	if SERVER and not game.SinglePlayer() then
+		for k,v in pairs(player.GetAll()) do
+			WarMod_TweakWeapon(v)
+		end
+	end
+	
+	if CLIENT or game.SinglePlayer() then
+		WarMod_TweakWeapon(LocalPlayer())
+	end
+
+end
+
+hook.Add("Think","WarMod: SharedThink",WarMod_SharedThink)
+
+function WarMod_TweakWeapon(ply)
+
+	local Weapon = ply:GetActiveWeapon()
+
+	if IsValid(Weapon) and Weapon:IsScripted() then
+		
+		if not Weapon.HasBeenTouchedByWarmods then
+	
+			local IsActivated = ply:GetNWBool("WarModActivated",false)
+			local ModType = ply:GetNWString("WarModClass","none")
+			local ModPower = ply:GetNWFloat("WarModPower",0)
+		
+			local GlobalMod = (1 + (ModPower/100))
+		
+			--print("ASSHOLE???")
+		
+			--print("WHO")
+		
+			if IsActivated then
+			
+				if ModType == "damage" then
+					if Weapon.Primary then
+						if Weapon.Primary.Damage then
+							Weapon.Primary.Damage = math.floor(Weapon.Primary.Damage * GlobalMod)
+						end
+						if Weapon.RecoilMul then
+							Weapon.RecoilMul = Weapon.RecoilMul / GlobalMod
+						end
+						if Weapon.HeatMul then
+							Weapon.HeatMul = Weapon.HeatMul / GlobalMod
+						end
+					end
+				elseif ModType == "ammo" then
+					if Weapon.Primary then
+						if Weapon.Primary.ClipSize then
+							Weapon.Primary.ClipSize = math.Clamp(math.floor(Weapon.Primary.ClipSize * GlobalMod),-1,200)
+						end
+					end
+				elseif ModType == "accuracy" then
+					if Weapon.Primary then
+						if Weapon.Primary.Cone then
+							Weapon.Primary.Cone = Weapon.Primary.Cone / GlobalMod
+						end
+					end
+				elseif ModType == "rate" then
+					if Weapon.Primary then
+						if Weapon.Primary.Delay then
+							Weapon.Primary.Delay = Weapon.Primary.Delay / GlobalMod
+						end
+					end				
+				end
+				
+			end
+
+			Weapon.HasBeenTouchedByWarmods = true
+
+		end
+
+	end
+	
+end
+
+
 
 
 if CLIENT then
-
-	
-
 
 	local Frame = {}
 	local Title = {}
@@ -422,7 +530,7 @@ if CLIENT then
 		local count = net.ReadFloat()
 		local Card = WarCreateCard(xsize,ysize,WarPickupCardList,mod,rank,count)
 		
-		timer.Simple(10,function() Card:Remove() end)
+		timer.Simple(5,function() Card:Remove() end)
 		
 	end)
 	
@@ -475,6 +583,7 @@ if CLIENT then
 		if mod ~= "none" and rank ~= 0 and count ~= 0 and Activated then
 			if not WarActivatedCard then
 				WarActivatedCard = WarCreateCard(xsize,ysize,WarActivatedCardList,mod,rank,count)
+				timer.Simple(10,function() WarActivatedCard:Remove() end)
 			end
 		end
 		
@@ -607,13 +716,13 @@ if CLIENT then
 					WarSendActivation(x,y,List,mod,rank)
 					chat.AddText(Color(255,255,255,255),"Activated mod. Will apply on next spawn.")
 				end)
-				TransmuteOptions[Count]:AddOption("Transmute x3", function()
+				TransmuteOptions[Count]:AddOption("Transmute x" .. TransmuteCost, function()
 					WarSendTransmute(x,y,List,mod,rank,1)
 				end)
-				TransmuteOptions[Count]:AddOption("Transmute x15", function()
+				TransmuteOptions[Count]:AddOption("Transmute x" .. TransmuteCost*5, function()
 					WarSendTransmute(x,y,List,mod,rank,5)
 				end)
-				TransmuteOptions[Count]:AddOption("Transmute x30", function()
+				TransmuteOptions[Count]:AddOption("Transmute x" .. TransmuteCost*10, function()
 					WarSendTransmute(x,y,List,mod,rank,10)
 				end)
 				
@@ -694,14 +803,14 @@ if CLIENT then
 	
 		local CurrentCount = tonumber( CountBase[mod .. rank]:GetText())
 	
-		if CurrentCount >= count*3 and rank < 10 then
+		if CurrentCount >= count*TransmuteCost and rank < 10 then
 	
-			CountBase[mod .. rank]:SetText( CurrentCount - count*3)
+			CountBase[mod .. rank]:SetText( CurrentCount - count*TransmuteCost)
 			
-			if not CountBase[mod .. rank+1] then
-				WarCreateCard(x,y,List,mod,rank+1,count)
-			else
+			if IsValid(CountBase[mod .. rank+1]) then
 				CountBase[mod .. rank+1]:SetText( tonumber( CountBase[mod .. rank+1]:GetText()) + count)
+			else
+				WarCreateCard(x,y,List,mod,rank+1,count)
 			end
 
 			local ply = LocalPlayer()

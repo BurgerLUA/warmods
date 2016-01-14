@@ -530,7 +530,11 @@ if CLIENT then
 		local count = net.ReadFloat()
 		local Card = WarCreateCard(xsize,ysize,WarPickupCardList,mod,rank,count)
 		
-		timer.Simple(5,function() Card:Remove() end)
+		timer.Simple(5,function() 
+			if Card then
+				Card:Remove() 
+			end
+		end)
 		
 	end)
 	
@@ -583,7 +587,11 @@ if CLIENT then
 		if mod ~= "none" and rank ~= 0 and count ~= 0 and Activated then
 			if not WarActivatedCard then
 				WarActivatedCard = WarCreateCard(xsize,ysize,WarActivatedCardList,mod,rank,count)
-				timer.Simple(10,function() WarActivatedCard:Remove() end)
+				timer.Simple(10,function() 
+					if WarActivatedCard then
+						WarActivatedCard:Remove()
+					end
+				end)
 			end
 		end
 		

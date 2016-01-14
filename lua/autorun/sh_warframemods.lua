@@ -1,14 +1,13 @@
-print("War Mods Loaded!")
+AddCSLuaFile()
 
 local WarframeMods = {}
-
 local TransmuteCost = 2
 
 WarframeMods["damage"] = {
-	Name = "Overpacked Bullets",
+	Name = "High Caliber",
 	Type = "DamageMul",
 	Logo = "hud/leaderboard_class_demo",
-	Desc = "Increases damage output by _%",
+	Desc = "Increases damage output by _%.",
 	RankValue = {10,20,30,40,50,60,70,80,90,100},
 	BaseCapacity = 5,
 	CostPower = 1.25,
@@ -39,11 +38,11 @@ WarframeMods["speed"] = {
 --]]
 
 WarframeMods["ammo"] = {
-	Name = "Custom Magazine",
+	Name = "Extended Magazine",
 	Type = "ClipMul",
 	Logo = "hud/leaderboard_class_heavy",
 	Desc = "Increases clip size by _%",
-	RankValue = {10,20,30,40,50,60,70,80,90,100},
+	RankValue = {25,50,75,100,125,150,175,200,225,250},
 	BaseCapacity = 5,
 	CostPower = 1.25,
 }
@@ -53,17 +52,17 @@ WarframeMods["accuracy"] = {
 	Type = "ClipMul",
 	Logo = "hud/leaderboard_class_sniper",
 	Desc = "Decreases spread by _%",
-	RankValue = {7,14,21,28,35,42,49,56,63,70},
+	RankValue = {10,20,30,40,50,60,70,80,90,100},
 	BaseCapacity = 5,
 	CostPower = 1.25,
 }
 
 WarframeMods["rate"] = {
-	Name = "Barrage",
+	Name = "Bullet Barrage",
 	Type = "ClipMul",
 	Logo = "hud/leaderboard_class_soldier_barrage",
 	Desc = "Increases fire rate by _%",
-	RankValue = {5,10,15,20,25,30,35,40,45,50},
+	RankValue = {20,40,60,80,100,120,140,160,180,200},
 	BaseCapacity = 5,
 	CostPower = 1.25,
 }
@@ -464,13 +463,13 @@ function WarMod_TweakWeapon(ply)
 				elseif ModType == "accuracy" then
 					if Weapon.Primary then
 						if Weapon.Primary.Cone then
-							Weapon.Primary.Cone = Weapon.Primary.Cone / GlobalMod
+							Weapon.Primary.Cone = math.Clamp(Weapon.Primary.Cone / GlobalMod,0,0.5)
 						end
 					end
 				elseif ModType == "rate" then
 					if Weapon.Primary then
 						if Weapon.Primary.Delay then
-							Weapon.Primary.Delay = Weapon.Primary.Delay / GlobalMod
+							Weapon.Primary.Delay = math.Clamp(Weapon.Primary.Delay / GlobalMod,0,100)
 						end
 					end				
 				end
@@ -857,3 +856,4 @@ if CLIENT then
 
 end
 
+print("War Mods Loaded!")

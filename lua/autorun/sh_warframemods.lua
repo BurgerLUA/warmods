@@ -138,6 +138,7 @@ if SERVER then
 	util.AddNetworkString( "WarNetSendTransmute" )
 	util.AddNetworkString( "WarPickupCard" )
 	util.AddNetworkString( "WarNetSendActivation")
+	util.AddNetworkString( "WarDataDisplayEnemyMod" )
 	
 	hook.Add("PlayerSpawn","War Data Player Initialize",WarDataPlayerInitalize)
 	
@@ -274,16 +275,11 @@ if SERVER then
 		local AllMods = WarGetAllModClasses()
 		local SelectedModType = AllMods[math.random(1,#AllMods)]
 		local Rank = WarGetRandRank()
-		
-
 
 		WarDataGiveMod(ply,SelectedModType,Rank,1)
 		
 	end
-	
 
-	
-	
 	function WarGetRandRank()
 	
 		local SelectedRank = 5
@@ -312,6 +308,22 @@ if SERVER then
 		if attacker:IsPlayer() and !attacker:IsBot() and attacker ~= victim then
 			WarDropMod(attacker,victim:GetPos())
 		end
+		
+		if attacker:GetNWFloat("WarModUses",0) > 0 then
+		
+		
+			local Class = attacker:GetNWString("WarModClass")
+			local Rank = attacker:GetNWFloat("WarModRank")
+			
+			print(Class,Rank)
+			
+			net.Start("WarDataDisplayEnemyMod")
+				net.WriteString(Class)
+				net.WriteFloat(Rank)
+			net.Send(victim)
+			
+		end
+		
 	end
 	
 	hook.Add("PlayerDeath","War Player Death",WarPlayerDeath)
@@ -403,6 +415,14 @@ if SERVER then
 	}
 	--]]
 	
+	function WarMod_ShowSpare1(ply)
+
+		ply:ConCommand("war_menu")
+	
+	end
+
+	hook.Add("ShowSpare1","WarMod: ShowSpare1 Override",WarMod_ShowSpare1)
+	
 
 end
 
@@ -447,12 +467,14 @@ function WarMod_TweakWeapon(ply)
 						if Weapon.Primary.Damage then
 							Weapon.Primary.Damage = math.floor(Weapon.Primary.Damage * GlobalMod)
 						end
+						--[[
 						if Weapon.RecoilMul then
 							Weapon.RecoilMul = Weapon.RecoilMul / GlobalMod
 						end
 						if Weapon.HeatMul then
 							Weapon.HeatMul = Weapon.HeatMul / GlobalMod
 						end
+						--]]
 					end
 				elseif ModType == "ammo" then
 					if Weapon.Primary then
@@ -463,7 +485,7 @@ function WarMod_TweakWeapon(ply)
 				elseif ModType == "accuracy" then
 					if Weapon.Primary then
 						if Weapon.Primary.Cone then
-							Weapon.Primary.Cone = math.Clamp(Weapon.Primary.Cone / GlobalMod,0,0.5)
+							Weapon.Primary.Cone = math.Clamp(Weapon.Primary.Cone - (Weapon.Primary.Cone * GlobalMod),0,0.5)
 						end
 					end
 				elseif ModType == "rate" then
@@ -522,6 +544,16 @@ if CLIENT then
 		WarActivatedCard = nil
 	end
 	
+	if WarEnemyCardList then
+		WarEnemyCardList:Remove()
+		WarEnemyCardList = nil
+	end
+	
+	if WarEnemyCard then
+		WarEnemyCard:Remove()
+		WarEnemyCard = nil
+	end
+
 	net.Receive("WarPickupCard", function()
 
 		local mod = net.ReadString()
@@ -553,10 +585,19 @@ if CLIENT then
 			WarPickupCardList:SetSpaceY( ScrW()*0.01 )
 			
 			WarActivatedCardList = vgui.Create( "DIconLayout", Scroll )
-			WarActivatedCardList:SetPos( ScrW()*0.01, ScrH()*0.01 )
-			WarActivatedCardList:SetSize( ScrW()*0.9 - xsize*0.1,ScrH()*0.9 - ysize*0.1 )
+			WarActivatedCardList:SetPos( ScrW()*0.01, ScrW()*0.01 )
+			WarActivatedCardList:SetSize( ScrW()*0.25,ScrH())
 			WarActivatedCardList:SetSpaceX( ScrW()*0.01 )
 			WarActivatedCardList:SetSpaceY( ScrW()*0.01 )
+			
+			local BaseX = xsize*0.3
+			local BaseY = BaseX*1.5
+			
+			WarEnemyCardList = vgui.Create( "DIconLayout", Scroll )
+			WarEnemyCardList:SetPos( ScrW()*0.5-BaseX/2, ScrH()*0.9 - BaseY )
+			WarEnemyCardList:SetSize( ScrW()*0.5,ScrH()*0.5)
+			WarEnemyCardList:SetSpaceX( ScrW()*0.01 )
+			WarEnemyCardList:SetSpaceY( ScrW()*0.01 )
 	
 			First = true
 		
@@ -661,6 +702,24 @@ if CLIENT then
 				
 		
 	end)
+	
+	net.Receive("WarDataDisplayEnemyMod",function(len)
+	
+		local mod = net.ReadString()
+		local rank = net.ReadFloat()
+
+		--print(mod,rank)
+		
+		WarEnemyCard = WarCreateCard(xsize,ysize,WarEnemyCardList,mod,rank,1)
+		
+		timer.Simple(5,function() 
+			if WarEnemyCard then
+				WarEnemyCard:Remove() 
+			end
+		end)
+	
+	end)
+	
 	
 	function WarCreateCard(x,y,List,mod,rank,count)
 	

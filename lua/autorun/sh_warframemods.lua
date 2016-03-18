@@ -305,22 +305,24 @@ if SERVER then
 	--WarGetRandRankDebug()
 	
 	function WarPlayerDeath(victim,weapon,attacker)
+	
 		if attacker:IsPlayer() and !attacker:IsBot() and attacker ~= victim then
 			WarDropMod(attacker,victim:GetPos())
 		end
 		
 		if attacker:GetNWFloat("WarModUses",0) > 0 then
 		
-		
 			local Class = attacker:GetNWString("WarModClass")
 			local Rank = attacker:GetNWFloat("WarModRank")
 			
-			print(Class,Rank)
+			if Class ~= "none" then
 			
-			net.Start("WarDataDisplayEnemyMod")
-				net.WriteString(Class)
-				net.WriteFloat(Rank)
-			net.Send(victim)
+				net.Start("WarDataDisplayEnemyMod")
+					net.WriteString(Class)
+					net.WriteFloat(Rank)
+				net.Send(victim)
+				
+			end
 			
 		end
 		
